@@ -57,7 +57,7 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
       totalRows++;
       
       // CUSTOMIZE THIS PART: Extract only the data you need
-      // Replace 'column1', 'column2' with your actual column names
+      // Replace these with your actual column names
       const extractedData = {
         // Example: If your CSV has columns 'name', 'email', 'age'
         name: row.name,           // Change 'name' to your column name
