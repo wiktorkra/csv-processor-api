@@ -14,14 +14,52 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json());
 
+// Helper function to check if date is within last 7 days
+function isWithinLast7Days(dateString) {
+  if (!dateString) return false;
+  
+  try {
+    // Your date format is: M/D/YYYY H:MM AM/PM (e.g., "7/14/2016 12:00 AM")
+    // JavaScript's Date constructor can parse this format directly
+    const parsedDate = new Date(dateString.trim());
+    
+    // Check if date is valid
+    if (isNaN(parsedDate.getTime())) {
+      console.log(`Invalid date format: ${dateString}`);
+      return false;
+    }
+    
+    // Calculate 7 days ago from today (start of day for comparison)
+    const today = new Date();
+    const sevenDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+    
+    // Get just the date part (ignore time) for comparison
+    const dateOnly = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+    
+    // Check if the date is within the last 7 days (inclusive)
+    const result = dateOnly >= sevenDaysAgo;
+    
+    // Log for debugging (remove this in production)
+    if (result) {
+      console.log(`✓ Date ${dateString} is within last 7 days`);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.log(`Error parsing date: ${dateString}`, error);
+    return false;
+  }
+}
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.json({ message: 'CSV Processor API is running!' });
 });
 
-// Main CSV processing endpoint - accepts file upload
+// Main CSV processing endpoint - accepts file upload with date filtering
 app.post('/process-csv', upload.single('csvfile'), (req, res) => {
-  console.log('Starting CSV processing...');
+  console.log('Starting CSV processing with date filtering...');
   
   // Use uploaded file if provided, or fall back to local path
   let csvFilePath;
@@ -42,6 +80,8 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
   const batchSize = 1000; // Process 1000 rows at a time
   let currentBatch = [];
   let totalRows = 0;
+  let filteredRows = 0;
+  let skippedRows = 0;
   
   // Check if file exists
   if (!fs.existsSync(csvFilePath)) {
@@ -52,52 +92,48 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
   }
   
   fs.createReadStream(csvFilePath)
-    .pipe(csv({ separator: '#' }))  // Use # as delimiter instead of comma
+    .pipe(csv())
     .on('data', (row) => {
       totalRows++;
       
-      // Extract your Polish building permit data columns
-      // Handle missing columns with || '' to avoid undefined values
-      const extractedData = {
-        numer_urzad: row.numer_urzad || '',
-        nazwa_organu: row.nazwa_organu || '',
-        adres_organu: row.adres_organu || '',
-        data_wplywu_wniosku: row.data_wplywu_wniosku || '',
-        numer_decyzji_urzedu: row.numer_decyzji_urzedu || '',
-        data_wydania_decyzji: row.data_wydania_decyzji || '',
-        nazwa_inwestor: row.nazwa_inwestor || '',
-        wojewodztwo: row.wojewodztwo || '',
-        miasto: row.miasto || '',
-        terc: row.terc || '',
-        cecha: row.cecha || '',
-        cecha_2: row['cecha (2)'] || '',  // Handle column with spaces/parentheses
-        ulica: row.ulica || '',
-        ulica_dalej: row.ulica_dalej || '',
-        nr_domu: row.nr_domu || '',
-        rodzaj_inwestycji: row.rodzaj_inwestycji || '',
-        kategoria: row.kategoria || '',
-        nazwa_zamierzenia_bud: row.nazwa_zamierzenia_bud || '',
-        nazwa_zam_budowalnego: row.nazwa_zam_budowalnego || '',
-        kubatura: row.kubatura || '',
-        projektant_nazwisko: row.projektant_nazwisko || '',
-        projektant_imie: row.projektant_imie || '',
-        projektant_numer_uprawnien: row.projektant_numer_uprawnien || '',
-        jednostka_numer_ew: row.jednostka_numer_ew || '',
-        obreb_numer: row.obreb_numer || '',
-        numer_dzialki: row.numer_dzialki || '',
-        numer_arkusza_dzialki: row.numer_arkusza_dzialki || '',
-        jednostka_stara_numeracja: row.jednostka_stara_numeracja_z_wniosku || '',
-        stara_numeracja_obreb: row.stara_numeracja_obreb_z_wnioskiu || '',
-        stara_numeracja_dzialka: row.stara_numeracja_dzialka_z_wniosku || ''
-      };
+      // Check if data_wydania_decyzji is within last 7 days
+      const dateValue = row.data_wydania_decyzji;
       
-      currentBatch.push(extractedData);
+      if (isWithinLast7Days(dateValue)) {
+        filteredRows++;
+        
+        // CUSTOMIZE THIS PART: Extract only the data you need
+        // Add all the columns you want to return
+        const extractedData = {
+          // Keep the date column
+          data_wydania_decyzji: dateValue,
+          
+          // Add other columns from your CSV as needed:
+          // Replace these with your actual column names
+          // id: row.id,
+          // nazwa: row.nazwa,
+          // status: row.status,
+          // adres: row.adres,
+          
+          // Include ALL columns if needed:
+          ...row  // This includes all columns from the CSV
+        };
+        
+        currentBatch.push(extractedData);
+        
+        // When we have enough filtered rows, save this batch
+        if (currentBatch.length >= batchSize) {
+          results.push([...currentBatch]);
+          currentBatch = [];
+          console.log(`Processed ${results.length * batchSize} filtered rows so far...`);
+        }
+      } else {
+        skippedRows++;
+      }
       
-      // When we have enough rows, save this batch
-      if (currentBatch.length >= batchSize) {
-        results.push([...currentBatch]);
-        currentBatch = [];
-        console.log(`Processed ${results.length * batchSize} rows so far...`);
+      // Log progress every 10000 rows
+      if (totalRows % 10000 === 0) {
+        console.log(`Progress: ${totalRows} total rows processed, ${filteredRows} matched filter, ${skippedRows} skipped`);
       }
     })
     .on('error', (error) => {
@@ -110,7 +146,11 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
         results.push(currentBatch);
       }
       
-      console.log(`CSV processing completed! Total rows: ${totalRows}, Batches: ${results.length}`);
+      console.log(`CSV processing completed!`);
+      console.log(`Total rows processed: ${totalRows}`);
+      console.log(`Rows matching filter (last 7 days): ${filteredRows}`);
+      console.log(`Rows skipped: ${skippedRows}`);
+      console.log(`Batches created: ${results.length}`);
       
       // Clean up uploaded file
       if (req.file) {
@@ -121,15 +161,29 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
       
       res.json({ 
         success: true,
-        totalRows: totalRows,
+        totalRowsProcessed: totalRows,
+        filteredRows: filteredRows,
+        skippedRows: skippedRows,
         totalBatches: results.length,
+        filterCriteria: 'data_wydania_decyzji within last 7 days',
         data: results 
       });
     });
 });
 
+// Optional: Endpoint to test date filtering logic
+app.post('/test-date', (req, res) => {
+  const { dateString } = req.body;
+  const isValid = isWithinLast7Days(dateString);
+  res.json({
+    date: dateString,
+    isWithinLast7Days: isValid,
+    sevenDaysAgo: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  });
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`CSV Processor API running at http://localhost:${port}`);
-  console.log('Ready to process your CSV files!');
+  console.log('Ready to process your CSV files with date filtering!');
 });
