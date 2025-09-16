@@ -52,21 +52,43 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
   }
   
   fs.createReadStream(csvFilePath)
-    .pipe(csv())
+    .pipe(csv({ separator: '#' }))  // Use # as delimiter instead of comma
     .on('data', (row) => {
       totalRows++;
       
-      // CUSTOMIZE THIS PART: Extract only the data you need
-      // Replace these with your actual column names
+      // Extract your Polish building permit data columns
+      // Handle missing columns with || '' to avoid undefined values
       const extractedData = {
-        // Example: If your CSV has columns 'name', 'email', 'age'
-        name: row.name,           // Change 'name' to your column name
-        email: row.email,         // Change 'email' to your column name
-        age: row.age              // Change 'age' to your column name
-        
-        // Add more fields as needed:
-        // date: row.created_date,
-        // status: row.status,
+        numer_urzad: row.numer_urzad || '',
+        nazwa_organu: row.nazwa_organu || '',
+        adres_organu: row.adres_organu || '',
+        data_wplywu_wniosku: row.data_wplywu_wniosku || '',
+        numer_decyzji_urzedu: row.numer_decyzji_urzedu || '',
+        data_wydania_decyzji: row.data_wydania_decyzji || '',
+        nazwa_inwestor: row.nazwa_inwestor || '',
+        wojewodztwo: row.wojewodztwo || '',
+        miasto: row.miasto || '',
+        terc: row.terc || '',
+        cecha: row.cecha || '',
+        cecha_2: row['cecha (2)'] || '',  // Handle column with spaces/parentheses
+        ulica: row.ulica || '',
+        ulica_dalej: row.ulica_dalej || '',
+        nr_domu: row.nr_domu || '',
+        rodzaj_inwestycji: row.rodzaj_inwestycji || '',
+        kategoria: row.kategoria || '',
+        nazwa_zamierzenia_bud: row.nazwa_zamierzenia_bud || '',
+        nazwa_zam_budowalnego: row.nazwa_zam_budowalnego || '',
+        kubatura: row.kubatura || '',
+        projektant_nazwisko: row.projektant_nazwisko || '',
+        projektant_imie: row.projektant_imie || '',
+        projektant_numer_uprawnien: row.projektant_numer_uprawnien || '',
+        jednostka_numer_ew: row.jednostka_numer_ew || '',
+        obreb_numer: row.obreb_numer || '',
+        numer_dzialki: row.numer_dzialki || '',
+        numer_arkusza_dzialki: row.numer_arkusza_dzialki || '',
+        jednostka_stara_numeracja: row.jednostka_stara_numeracja_z_wniosku || '',
+        stara_numeracja_obreb: row.stara_numeracja_obreb_z_wnioskiu || '',
+        stara_numeracja_dzialka: row.stara_numeracja_dzialka_z_wniosku || ''
       };
       
       currentBatch.push(extractedData);
