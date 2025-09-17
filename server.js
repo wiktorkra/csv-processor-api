@@ -74,7 +74,7 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
   }
   
   fs.createReadStream(csvFilePath)
-    .pipe(csv())
+    .pipe(csv({ separator: '#' }))  // Use # as delimiter instead of comma
     .on('data', (row) => {
       totalRows++;
       
