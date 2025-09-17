@@ -78,10 +78,23 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
     .on('data', (row) => {
       totalRows++;
       
-      // Debug: log first few rows to see column names and date format
-      if (totalRows <= 5) {
-        console.log(`Row ${totalRows} columns:`, Object.keys(row));
-        console.log(`Row ${totalRows} data_wydania_decyzji:`, row.data_wydania_decyzji);
+      // Debug: Find the date column
+      if (totalRows === 1) {
+        const columns = Object.keys(row);
+        console.log('All columns:', columns);
+        
+        // Look for columns containing "data" and "decyzji"
+        const dateColumns = columns.filter(col => 
+          col.toLowerCase().includes('data') || 
+          col.toLowerCase().includes('decyzji') ||
+          col.toLowerCase().includes('wydania')
+        );
+        console.log('Potential date columns:', dateColumns);
+        
+        // Show values for these potential date columns
+        dateColumns.forEach(col => {
+          console.log(`${col}:`, row[col]);
+        });
       }
       
       const dateValue = row.data_wydania_decyzji;
