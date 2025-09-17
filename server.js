@@ -14,7 +14,7 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json());
 
-// Helper function to check if date is within last 365 days (for testing)
+// Helper function to check if date is within last 7 days (for testing)
 function isWithinLast7Days(dateString) {
   if (!dateString) return false;
   
@@ -25,9 +25,9 @@ function isWithinLast7Days(dateString) {
       return false;
     }
     
-    // Calculate 365 days ago from today (for testing)
+    // Calculate 7 days ago from today (for testing)
     const today = new Date();
-    const daysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 365);
+    const daysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
     
     const dateOnly = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
     
@@ -137,7 +137,7 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
         filteredRows: filteredRows,
         skippedRows: skippedRows,
         totalBatches: results.length,
-        filterCriteria: 'data_wydania_decyzji within last 365 days',
+        filterCriteria: 'data_wydania_decyzji within last 7 days',
         data: results 
       });
     });
@@ -149,7 +149,7 @@ app.post('/test-date', (req, res) => {
   const isValid = isWithinLast7Days(dateString);
   res.json({
     date: dateString,
-    isWithinLast365Days: isValid
+    isWithinLast7Days: isValid
   });
 });
 
