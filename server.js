@@ -14,7 +14,7 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json());
 
-// Helper function to check if date is within last 7 days
+// Helper function to check if date is within last 365 days (for testing)
 function isWithinLast7Days(dateString) {
   if (!dateString) return false;
   
@@ -36,12 +36,12 @@ function isWithinLast7Days(dateString) {
     // Get just the date part (ignore time) for comparison
     const dateOnly = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
     
-    // Check if the date is within the last 7 days (inclusive)
+    // Check if the date is within the last 365 days (inclusive)
     const result = dateOnly >= sevenDaysAgo;
     
     // Log for debugging (remove this in production)
     if (result) {
-      console.log(`✓ Date ${dateString} is within last 7 days`);
+      console.log(`✓ Date ${dateString} is within last 365 days`);
     }
     
     return result;
@@ -75,38 +75,6 @@ app.post('/process-csv', upload.single('csvfile'), (req, res) => {
       error: 'No file provided. Either upload a file or provide filePath in request body.' 
     });
   }
-
-// Alternative JSON-only endpoint for testing
-app.post('/process-csv-json', (req, res) => {
-  console.log('Starting CSV processing via JSON with date filtering...');
-  
-  const { filePath, csvData } = req.body;
-  
-  if (!filePath && !csvData) {
-    return res.status(400).json({ 
-      error: 'Provide either filePath (server file path) or csvData (base64 encoded CSV content)' 
-    });
-  }
-  
-  let csvFilePath = filePath;
-  
-  // If CSV data is provided as base64, write it to temp file
-  if (csvData) {
-    const tempFileName = `temp_${Date.now()}.csv`;
-    csvFilePath = `uploads/${tempFileName}`;
-    
-    try {
-      // Decode base64 and write to file
-      const csvContent = Buffer.from(csvData, 'base64').toString('utf8');
-      fs.writeFileSync(csvFilePath, csvContent);
-      console.log('Created temporary CSV file from base64 data');
-    } catch (error) {
-      return res.status(400).json({ 
-        error: 'Failed to decode CSV data',
-        details: error.message 
-      });
-    }
-  }
   
   const results = [];
   const batchSize = 1000; // Process 1000 rows at a time
@@ -114,7 +82,6 @@ app.post('/process-csv-json', (req, res) => {
   let totalRows = 0;
   let filteredRows = 0;
   let skippedRows = 0;
-  let isTemporaryFile = csvData ? true : false;
   
   // Check if file exists
   if (!fs.existsSync(csvFilePath)) {
@@ -129,7 +96,7 @@ app.post('/process-csv-json', (req, res) => {
     .on('data', (row) => {
       totalRows++;
       
-      // Check if data_wydania_decyzji is within last 7 days
+      // Check if data_wydania_decyzji is within last 365 days
       const dateValue = row.data_wydania_decyzji;
       
       // Log first 10 date values for debugging
@@ -179,18 +146,14 @@ app.post('/process-csv-json', (req, res) => {
       
       console.log(`CSV processing completed!`);
       console.log(`Total rows processed: ${totalRows}`);
-      console.log(`Rows matching filter (last 7 days): ${filteredRows}`);
+      console.log(`Rows matching filter (last 365 days): ${filteredRows}`);
       console.log(`Rows skipped: ${skippedRows}`);
       console.log(`Batches created: ${results.length}`);
       
-      // Clean up files
+      // Clean up uploaded file
       if (req.file) {
         fs.unlink(csvFilePath, (err) => {
-          if (err) console.error('Error cleaning up uploaded file:', err);
-        });
-      } else if (isTemporaryFile) {
-        fs.unlink(csvFilePath, (err) => {
-          if (err) console.error('Error cleaning up temporary file:', err);
+          if (err) console.error('Error cleaning up file:', err);
         });
       }
       
@@ -212,8 +175,8 @@ app.post('/test-date', (req, res) => {
   const isValid = isWithinLast7Days(dateString);
   res.json({
     date: dateString,
-    isWithinLast7Days: isValid,
-    sevenDaysAgo: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    isWithinLast365Days: isValid,
+    365DaysAgo: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
   });
 });
 
